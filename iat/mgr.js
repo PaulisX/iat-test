@@ -131,7 +131,6 @@ define(['managerAPI',
 
 
             { inherit: 'intro' },
-            { inherit: 'explicits' },
             {
                 mixer: 'random',
                 data: [
