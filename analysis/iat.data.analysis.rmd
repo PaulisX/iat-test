@@ -1,8 +1,8 @@
 
 ```{r}
-zip.directory <- '../data'
-raw.directory <- paste0(zip.directory,'/raw.files')
-proc.directory <- paste0(zip.directory,'/processed')
+zip.directory <- '..\\data'
+raw.directory <- paste0(zip.directory,'\\raw.files')
+proc.directory <- paste0(zip.directory,'\\processed')
 ```
 
 
@@ -13,10 +13,10 @@ proc.directory <- paste0(zip.directory,'/processed')
 library(readr)
 
 # Define the name of the zip file (that the storage download from the osf)
-zip_file <- paste0(zip.directory,"/osfstorage-archive.zip")
+zip_file <- paste0(zip.directory,"\\osfstorage-archive.zip")
 
 # Create the directories
-dir.create(raw.directory, showWarnings = FALSE, recursive = TRUE)
+dir.create(raw.directory, showWarnings = TRUE, recursive = TRUE)
 dir.create(proc.directory, showWarnings = FALSE, recursive = TRUE)
 # List the files in the zip file
 files <- unzip(zip_file, list = TRUE, exdir = raw.directory)$Name
@@ -103,7 +103,7 @@ table(iatscore$SUBEXCL, exclude=NULL)
 
 ```{r}
 #Write a csv file with the IAT scores
-write.csv(iatscore, paste(proc.directory,'iatscore.csv',sep='/'))
+write.csv(iatscore, paste(proc.directory,'iatscore.csv',sep='\\'))
 ```
 
 # Process the self-report questionnaire
@@ -139,7 +139,7 @@ qst <- reshape2::dcast(data = for.exp, formula = sessionId ~ name, value.var = '
 ```
 
 ```{r}
-write.csv(qst, paste(proc.directory, 'qst.csv', sep='/'))
+write.csv(qst, paste(proc.directory, 'qst.csv', sep='\\'))
 ```
 
 # Read conditions
@@ -158,15 +158,15 @@ conds <- merge(conds, blockOrder, by='sessionId', all = T)
 ```
 
 ```{r}
-write.csv(conds, paste(proc.directory, 'conds.csv', sep='/'))
+write.csv(conds, paste(proc.directory, 'conds.csv', sep='\\'))
 ```
 
 # Merge all processed data
 
 ```{r}
-iatscores <- read.csv(paste(proc.directory, 'iatscore.csv', sep='/'))
-selfReport <- read.csv(paste(proc.directory, 'qst.csv', sep='/'))
-conditions <- read.csv(paste(proc.directory, 'conds.csv', sep='/'))
+iatscores <- read.csv(paste(proc.directory, 'iatscore.csv', sep='\\'))
+selfReport <- read.csv(paste(proc.directory, 'qst.csv', sep='\\'))
+conditions <- read.csv(paste(proc.directory, 'conds.csv', sep='\\'))
 ```
 
 ```{r}

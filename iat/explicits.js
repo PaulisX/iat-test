@@ -38,8 +38,8 @@ define(['questAPI'], function (Quest) {
         decline: false,
         required: true,
         errorMsg: {
-            required: isTouch ? "Due to the University of Virginia’s Institutional Review Board regulations, Project Implicit is required to collect information about the age of visitors to our website. Please select an answer to continue." :
-                "Due to the University of Virginia’s Institutional Review Board regulations, Project Implicit is required to collect information about the age of visitors to our website. Please select an answer to continue."
+            required: isTouch ? "Lūdzu aizpildiet šo lauku!" :
+                "Lūdzu aizpildiet šo lauku!"
         },
         autoSubmit: true,
         numericValues: true

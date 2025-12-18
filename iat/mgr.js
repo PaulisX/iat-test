@@ -9,7 +9,7 @@ define(['managerAPI',
 
         var API = new Manager();
         //const subid = Date.now().toString(16)+Math.floor(Math.random()*10000).toString(16);
-        init_data_pipe(API, 'aE4lKR8hWs1B', { file_type: 'csv' });
+        init_data_pipe(API, 'hBA8sfsJrtcZ', { file_type: 'csv' });
 
         API.setName('mgr');
         API.addSettings('skip', true);
@@ -37,15 +37,15 @@ define(['managerAPI',
         API.addTasksSet({
             instructions: [{
                 type: 'message',
-                buttonText: 'Continue'
+                buttonText: 'Turpināt'
             }],
 
             intro: [{
                 inherit: 'instructions',
                 name: 'intro',
                 templateUrl: 'intro.jst',
-                title: 'Intro',
-                header: 'Welcome'
+                title: 'Ievads',
+                header: 'Laipni lūgti'
             }],
             
             explicits: [{
@@ -58,8 +58,8 @@ define(['managerAPI',
                 inherit: 'instructions',
                 name: 'transiat_instructions',
                 templateUrl: 'transiat_instructions.jst',
-                title: 'IAT Instructions',
-                header: 'Implicit Association Test'
+                title: 'IAT instrukcijas',
+                header: 'Implicitās Attieksmes tests'
             }],
 
             transiat: [{
@@ -72,10 +72,10 @@ define(['managerAPI',
                 type: 'message',
                 name: 'lastpage',
                 templateUrl: 'lastpage.jst',
-                title: 'End',
+                title: 'Beigas',
                 //Uncomment the following if you want to end the study here.
                 //last:true, 
-                header: 'You have completed the study'
+                header: 'Tu esi pabeidzis testu'
             }],
 
             //Use if you want to redirect the participants elsewhere at the end of the study
@@ -86,7 +86,7 @@ define(['managerAPI',
                 }],
 
             //This task waits until the data are sent to the server.
-            uploading: uploading_task({ header: 'just a moment', body: 'Please wait, sending data... ' })
+            uploading: uploading_task({ header: 'Vienu mirkli', body: 'Lūdzu uzgaidiet, tiek sūtīti dati... ' })
         });
 
         API.addSequence([
