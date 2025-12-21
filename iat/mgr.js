@@ -90,7 +90,12 @@ define(['managerAPI',
         });
 
         API.addSequence([
-            { type: 'isTouch' }, //Use Minno's internal touch detection mechanism. 
+            { 
+                type: 'isTouch',
+                text: 'Vai testa izpildes laikā vēlaties izmantot skārienjūtīgu ekrānu vai tastatūru?',
+                yesText: 'Izmantošu skārienjūtīgu ekrānu',
+                noText: 'Izmantošu tastatūru.' 
+            }, //Use Minno's internal touch detection mechanism. mechanism.  
 
             { type: 'post', path: ['$isTouch'] },
 
