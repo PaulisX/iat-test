@@ -1,8 +1,25 @@
 
 ```{r}
-zip.directory <- '..\\data'
-raw.directory <- paste0(zip.directory,'\\raw.files')
-proc.directory <- paste0(zip.directory,'\\processed')
+# install.packages(c("readr","data.table","reshape2","dplyr","tidyr"))
+
+```
+
+```{r}
+zip.directory <- '../data'
+raw.directory <- paste0(zip.directory,'/raw.files')
+proc.directory <- paste0(zip.directory,'/processed')
+
+expected_cols <- list(
+  transiat = c("log_serial","trial_id","name","responseHandle","latency","stimuli","media","data.blockStart","data.condition","data.score","data.block","sessionId","data.parcel","data.corResp","block3Cond","feedback","d"),
+  
+  ds_r = c("name","response","serial","latency","pristineLatency","declined","submitLatency","sessionId"),
+  
+  tabs = c("name","response","serial","latency","pristineLatency","declined","submitLatency","sessionId"),
+  
+  explicits = c("name","response","serial","latency","pristineLatency","declined","submitLatency","sessionId"),
+  
+  unnamedTask = c("`$isTouch`","sessionId")
+)
 ```
 
 
@@ -13,7 +30,7 @@ proc.directory <- paste0(zip.directory,'\\processed')
 library(readr)
 
 # Define the name of the zip file (that the storage download from the osf)
-zip_file <- paste0(zip.directory,"\\osfstorage-archive.zip")
+zip_file <- paste0(zip.directory,"/osfstorage-archive.zip")
 
 # Create the directories
 dir.create(raw.directory, showWarnings = TRUE, recursive = TRUE)
@@ -22,37 +39,71 @@ dir.create(proc.directory, showWarnings = FALSE, recursive = TRUE)
 files <- unzip(zip_file, list = TRUE, exdir = raw.directory)$Name
 
 # Extract the prefixes from the file names
-prefixes <- sub("_.*", "", files)
+prefixes <- sub("_[^_]+\\.csv$", "", files)
 
 # Create an empty list to store the data frames
 data_list <- list()
 
 # Loop over the unique prefixes
+
 for (p in unique(prefixes)) {
-  # Filter the files that match the prefix
+  
   p_files <- files[prefixes == p]
   
-  # Read the files into a data frame
-  p_data <- read_csv(unzip(zip_file, p_files, exdir = raw.directory))
+  dfs <- lapply(p_files, function(f) {
+    
+    # Extract ONE file and get its path
+    extracted_path <- unzip(zip_file, files = f, exdir = raw.directory)
+    
+    # Read that one file
+    readr::read_csv(
+      extracted_path,
+      col_types = readr::cols(.default = "c"),
+      show_col_types = FALSE
+    )
+  })
+  # filter only the wanted columns
+  dfs <- lapply(dfs, function(df) {
+    
+    # Drop fbclid and any other unexpected columns
+    df$fbclid <- NULL
+    
+    # Add missing expected columns
+    missing <- setdiff(expected_cols[[p]], names(df))
+    df[missing] <- NA
+    
+    # Keep only expected columns, in correct order
+    df <- df[expected_cols[[p]]]
+    
+    df
+  })
   
-  # Rbind the columns
-  p_data <- do.call(rbind, p_data)
+  # Safe row-bind (fills missing columns with NA)
+  p_data <- dplyr::bind_rows(dfs)
   
-  # Add the data frame to the list with the prefix as the name
   data_list[[p]] <- p_data
 }
 
+
+# for (p in unique(prefixes)) {
+#   # Filter the files that match the prefix
+#   p_files <- files[prefixes == p]
+  
+#   # Read the files into a data frame
+#   p_data <- read_csv(unzip(zip_file, p_files, exdir = raw.directory))
+  
+#   # Rbind the columns
+#   p_data <- do.call(rbind, p_data)
+  
+#   # Add the data frame to the list with the prefix as the name
+#   data_list[[p]] <- p_data
+# }
 ```
 # Process IAT
 
 ```{r}
 ##Read all the IAT data files.
-raw.iat <- as.data.frame(t(data_list[['transiat']]))
-```
-
-```{r}
-#data.condition holds the block pairing condition.
-table(raw.iat$data.condition, exclude=NULL)
+raw.iat <- data_list[['transiat']]
 ```
 
 ```{r}
@@ -64,9 +115,7 @@ raw.iat$blockName <- ifelse(raw.iat$data.condition %in% c('Transpersonas/Slikti 
                         ifelse(raw.iat$data.condition %in% c('Cispersonas/Slikti vārdi,Transpersonas/Labi vārdi'), 
                           ifelse(raw.iat$data.block %in% c(3,6), 'B6', 
                                  ifelse(raw.iat$data.block %in% c(4,7), 'B7', NA)), NA))
-table(raw.iat$blockName, exclude=NULL)
-#Make sure the <NA> comes only from practice blocks and insrtuction tiles
-table(raw.iat$data.block[which(is.na(raw.iat$blockName))], exclude=NULL)
+# table(raw.iat$blockName, exclude=NULL)
 ```
 
 ```{r}
@@ -82,51 +131,30 @@ raw.iat$trial_error <- as.numeric(as.character(raw.iat$data.score))
 table(raw.iat$trial_error, exclude=NULL)
 
 ```
-
 ```{r}
-library(IAT)
-
-#Score the IAT
-
-iatscore <- cleanIAT(raw.iat, block_name="blockName", 
-                     trial_blocks = c("B3", "B4", "B6", "B7"), 
-                     session_id="sessionId", 
-                     trial_latency="trial_latency",
-                     trial_error = "trial_error", 
-                     v_error=2, v_extreme=2, v_std=1) #v_error=2 means recode error latency to m+600
-
-#Some descriptive statistics of the IAT score
-summary(iatscore$IAT)
-#Frequency of excluded participants
-table(iatscore$SUBEXCL, exclude=NULL)
+# raw.iat$trial_correct <- 1-raw.iat$trial_error
 ```
-
 ```{r}
-#Write a csv file with the IAT scores
-write.csv(iatscore, paste(proc.directory,'iatscore.csv',sep='\\'))
+source('./score_IAT.r')
+
+score <- score_IAT(raw.iat)
+# table(score)
+write.csv(score, paste(proc.directory, 'iat.csv', sep='/'))
 ```
 
 # Process the self-report questionnaire
 
 ```{r}
-for.qst <- as.data.frame(t(data_list[['explicits']]))
-```
+for.qst <- data_list[['explicits']]
 
-
-```{r}
 class(for.qst$response)
 #Convert to numeric
 for.qst$resp <- as.numeric(as.character(for.qst$response))
 #Convert -999 to NA; Notice that we lose here information about the rare of skipping questions.
 for.qst$resp <- ifelse(for.qst$resp==-999, NA, for.qst$resp)
-```
 
-```{r}
 table(for.qst$name)
-```
 
-
-```{r}
 library(data.table)
 dups <- setDF(setDT(for.qst)[, if (.N > 1L) .SD, by=.(sessionId, name)])
 dup.sids <- dups$sessionId
@@ -135,43 +163,118 @@ for.exp <- for.qst[which(!for.qst$sessionId %in% dup.sids),c('sessionId','name',
 
 library(reshape2)
 
-qst <- reshape2::dcast(data = for.exp, formula = sessionId ~ name, value.var = 'resp')
+qst <- reshape2::dcast(data = for.qst, formula = sessionId ~ name, value.var = 'resp')
+
+write.csv(qst, paste(proc.directory, 'qst.csv', sep='/'))
 ```
 
+# Process the DS_R questionnaire
+
 ```{r}
-write.csv(qst, paste(proc.directory, 'qst.csv', sep='\\'))
+for.dsr <- data_list[['ds_r']]
+
+class(for.dsr$response)
+#Convert to numeric
+for.dsr$resp <- as.numeric(as.character(for.dsr$response))
+#Convert -999 to NA; Notice that we lose here information about the rare of skipping questions.
+for.dsr$resp <- ifelse(for.dsr$resp==-999, NA, for.dsr$resp)
+
+table(for.dsr$name)
+
+library(data.table)
+dups <- setDF(setDT(for.dsr)[, if (.N > 1L) .SD, by=.(sessionId, name)])
+dup.sids <- dups$sessionId
+for.exp <- for.dsr[which(!for.dsr$sessionId %in% dup.sids),c('sessionId','name','resp')]
+
+library(reshape2)
+
+dsr <- reshape2::dcast(data = for.exp, formula = sessionId ~ name, value.var = 'resp')
+
+write.csv(dsr, paste(proc.directory, 'dsr.csv', sep='/'))
+```
+
+# Process the TABS questionnaire
+
+```{r}
+for.tabs <- data_list[['tabs']]
+
+class(for.tabs$response)
+#Convert to numeric
+for.tabs$resp <- as.numeric(as.character(for.tabs$response))
+#Convert -999 to NA; Notice that we lose here information about the rare of skipping questions.
+for.tabs$resp <- ifelse(for.tabs$resp==-999, NA, for.tabs$resp)
+
+table(for.tabs$name)
+
+library(data.table)
+dups <- setDF(setDT(for.tabs)[, if (.N > 1L) .SD, by=.(sessionId, name)])
+dup.sids <- dups$sessionId
+for.exp <- for.tabs[which(!for.tabs$sessionId %in% dup.sids),c('sessionId','name','resp')]
+
+library(reshape2)
+
+tabs <- reshape2::dcast(data = for.exp, formula = sessionId ~ name, value.var = 'resp')
+
+write.csv(tabs, paste(proc.directory, 'tabs.csv', sep='/'))
 ```
 
 # Read conditions
 
-```{r}
-conds <- as.data.frame(t(data_list[['unnamedTask']]))
-blockOrder <- raw.iat[which(!is.na(raw.iat$block3Cond)),c('sessionId','block3Cond')]
+  ```{r}
+  conds <- data_list[['unnamedTask']]
+  blockOrder <- raw.iat[which(!is.na(raw.iat$block3Cond)),c('sessionId','block3Cond')]
 
-blockOrder$iat.order <- ifelse(blockOrder$block3Cond %in% c('Transpersonas/Slikti vārdi,Cispersonas/Labi vārdi'), 
-                        'compatibleFirst', 
-                        ifelse(blockOrder$block3Cond %in% c('Cispersonas/Slikti vārdi,Transpersonas/Labi vārdi'), 
-                          'incompatibleFirst', NA))
-table(blockOrder$iat.order, exclude=NULL)
+  blockOrder$iat.order <- ifelse(blockOrder$block3Cond %in% c('Transpersonas/Slikti vārdi,Cispersonas/Labi vārdi'), 
+                          'compatibleFirst', 
+                          ifelse(blockOrder$block3Cond %in% c('Cispersonas/Slikti vārdi,Transpersonas/Labi vārdi'), 
+                            'incompatibleFirst', NA))
+  table(blockOrder$iat.order, exclude=NULL)
 
-conds <- merge(conds, blockOrder, by='sessionId', all = T)
-```
-
-```{r}
-write.csv(conds, paste(proc.directory, 'conds.csv', sep='\\'))
-```
+  conds <- merge(conds, blockOrder, by='sessionId', all = T)
+  write.csv(conds, paste(proc.directory, 'conds.csv', sep='/'))
+  ```
 
 # Merge all processed data
 
 ```{r}
-iatscores <- read.csv(paste(proc.directory, 'iatscore.csv', sep='\\'))
-selfReport <- read.csv(paste(proc.directory, 'qst.csv', sep='\\'))
-conditions <- read.csv(paste(proc.directory, 'conds.csv', sep='\\'))
+iat <- read.csv(paste(proc.directory, 'iat.csv', sep='/'))
+qst <- read.csv(paste(proc.directory, 'qst.csv', sep='/'))
+conditions <- read.csv(paste(proc.directory, 'conds.csv', sep='/'))
+dsr <- read.csv(paste(proc.directory, 'dsr.csv', sep='/'))
+tabs <- read.csv(paste(proc.directory, 'tabs.csv', sep='/'))
+```
+```{r}
+
+iat_pref <- iat %>%
+  dplyr::select(sessionId, IAT, IAT1, IAT2) %>%
+  dplyr::rename_with(~ paste0("iat_", .x), -sessionId)
+
+dsr_pref <- dsr %>%
+  dplyr::rename_with(~ paste0("dsr_", .x), -sessionId)
+
+tabs_pref <- tabs %>%
+  dplyr::rename_with(~ paste0("tabs_", .x), -sessionId)
+
+personal_pref <- qst %>%
+  dplyr::rename_with(~ paste0("personal_", .x), -sessionId)
+
+conditions_pref <- conditions %>%
+  dplyr::rename_with(~ paste0("conditions_", .x), -sessionId)
+
 ```
 
 ```{r}
-all <- merge(iatscores, selfReport, by='sessionId', all = T)
-all <- merge(all, conditions, by='sessionId', all = T)
+# all <- merge(iatscores, selfReport, by='sessionId', all = T)
+# all <- merge(all, conditions, by='sessionId', all = T)
+
+all <- iat_pref %>%
+  merge(conditions_pref, by = "sessionId") %>%
+  merge(personal_pref,  by = "sessionId") %>%
+  merge(dsr_pref,    by = "sessionId") %>%
+  merge(tabs_pref,   by = "sessionId")
+print(all)
+write.csv(all, paste(proc.directory, 'all.csv', sep='/'))
+
 ```
 
 ```{r}
